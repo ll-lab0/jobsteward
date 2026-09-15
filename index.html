@@ -2195,16 +2195,18 @@ document.addEventListener('touchmove', function(e){ if(e.touches.length > 1){ e.
     var gistShow=document.getElementById('ghGistShow');
     var rediscoverBtn=document.getElementById('ghRediscover');
     var advBlock=document.getElementById('ghAdvanced');
+    var tokenInvalid = lastSyncType === 'error' && /令牌无效或权限不足/.test(lastSyncText);
     if(gh.enabled){
-      tokenWrap.style.display='none';
-      connectBtn.style.display='none';
-      nowBtn.style.display='';
+      tokenWrap.style.display = tokenInvalid ? '' : 'none';
+      connectBtn.style.display = tokenInvalid ? '' : 'none';
+      connectBtn.textContent = tokenInvalid ? '保存并重新连接' : '保存并连接';
+      nowBtn.style.display = tokenInvalid ? 'none' : '';
       syncHint.style.display='none';
-      advBlock.style.display='';
+      advBlock.style.display = tokenInvalid ? 'none' : '';
       statusLine.style.display='';
       statusLine.innerHTML='已连接 GitHub 私有 Gist<div style="margin-top:4px;">当前同步状态：<b id="ghSyncState">'+getSyncTextForModal(lastSyncText)+'</b> · 本地 <b>'+activeRows().length+'</b> 条</div><div style="margin-top:2px;font-size:12px;color:var(--sub);">打开/刷新页面自动同步，也可点「立即同步」手动触发。</div>';
-      rediscoverBtn.style.display='';
-      if(gh.gistId){
+      rediscoverBtn.style.display = tokenInvalid ? 'none' : '';
+      if(gh.gistId && !tokenInvalid){
         gistShow.style.display='';
         gistShow.innerHTML='<span class="gist-id-copy" style="cursor:pointer;" title="点击复制 Gist ID">当前备份 Gist ID：<b style="word-break:break-all;">'+esc(gh.gistId)+'</b>（点击复制）</span>';
         var el=gistShow.querySelector('.gist-id-copy');
