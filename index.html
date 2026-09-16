@@ -1818,7 +1818,9 @@ document.addEventListener('touchmove', function(e){ if(e.touches.length > 1){ e.
   // ===== JD 自动识别填充（公司 / 职位 / 薪资）=====
   var jdInput=document.getElementById('jdInput');
   var jdHint=document.getElementById('jdHint');
-  function cleanStr(s){ return (s||'').replace(/\s+/g,'').trim(); }
+  function cleanStr(s){ return (s||'').replace(/[*_`#>]/g,'').replace(/\s+/g,'').trim(); }
+  function stripMd(s){ return (s||'').replace(/\*+/g,'').replace(/^#+\s*/,'').replace(/[`>]/g,'').trim(); }
+  function cleanPos(s){ return stripMd(s).replace(/\s+/g,' ').trim(); } // 职位：剥 markdown + 压缩空白但保留单词间空格（英文标题如 AI Operations Builder）
   function parseJD(text){
     var r={company:'',position:'',salary:''};
     if(!text) return r;
@@ -1845,8 +1847,9 @@ document.addEventListener('touchmove', function(e){ if(e.touches.length > 1){ e.
     for(var i=0;i<salRe.length;i++){ var m=text.match(salRe[i]); if(m){ r.salary=cleanStr(m[0]); break; } }
     if(!r.salary){ var sk=kv(['薪资','工资','薪酬','待遇','月薪','年包','薪资范围','薪酬范围'],40); if(sk && (/\d/.test(sk) || /面议|面聊|具体面议/.test(sk))) r.salary=sk; }
     // 公司：键值对优先，启发式兜底
-    function badCompany(v){ return v.length>16 || /简介|我们|一家|专注于|致力于|是一家|成立于|总部|提供|解决方案|服务商|平台|目前|旗下|业务/.test(v); }
+    function badCompany(v){ return v.length>22 || /简介|我们|一家|专注于|致力于|是一家|成立于|总部|提供|解决方案|服务商|平台|目前|旗下|业务|招聘/.test(v); }
     var compRe=[
+      /(?:^|\n)\s*([一-龥A-Za-z0-9（）()·&． ]{2,20}?)\s*(?:正在)?招聘/,   // 月之暗面（Moonshot AI）正在招聘 / XX公司 招聘（类含空格，避免跳到英文名中间）
       /([一-龥A-Za-z0-9（）()·&．]{2,16}?公司)/,
       /([一-龥A-Za-z0-9（）()·&．]{2,16}?集团)/,
       /公司名称[：: ]*([一-龥A-Za-z0-9（）()·&．]{2,20})/,
@@ -1855,17 +1858,27 @@ document.addEventListener('touchmove', function(e){ if(e.touches.length > 1){ e.
       /([一-龥A-Za-z0-9（）()·&．]{2,16}(?:科技|技术|网络|信息技术|信息|咨询|实业|控股))/
     ];
     r.company=kv(['公司名','公司','公司名称','雇主','用人单位'],30);
+    // 首行启发式：JD 首行常是「XX公司 招聘 / XX正在招聘」或纯公司名
+    if(!r.company){
+      var fl=(text.split(/\r?\n/).map(function(s){return s.trim();}).filter(Boolean)[0]||'');
+      if(fl && !/^#/.test(fl)){
+        var fm=fl.match(/^(.+?)(?:正在)?招聘/);
+        var fc=stripMd(fm?fm[1]:fl).replace(/[：:].*$/,'');
+        if(fc.length>=2 && fc.length<=24 && !badCompany(fc)) r.company=fc;
+      }
+    }
     if(!r.company){ for(var j=0;j<compRe.length;j++){ var cm=text.match(compRe[j]); if(cm){ var cv=cleanStr(cm[1]||cm[0]); if(cv.length>=2 && cv.length<=24 && !/^(无公司|公司信息|未知|待定|无|未|某某)/.test(cv) && !badCompany(cv)){ r.company=cv; break; } } } }
     // 职位：键值对优先，启发式兜底
     var posRe=[
+      /^[ \t]*#\s+([^#\r\n]{2,40})$/m,                       // # AI Operations Builder（Markdown 一级标题=岗位名，类不含换行，避免吞下一行）
       /招聘\s*([一-龥A-Za-z0-9/·]{2,18}?(?:经理|工程师|专员|总监|主管|专家|顾问|BP|PM|代表|助理|负责人|策划|设计|分析师|岗|职位|岗位))/,
       /诚聘\s*([一-龥A-Za-z0-9/·]{2,18}?(?:经理|工程师|专员|总监|主管|专家|顾问|BP|PM|代表|助理|负责人|策划|设计|分析师))/,
       /岗位[名称：: ]*([一-龥A-Za-z0-9/·]{2,18})/,
-      /职位[名称：: ]*([一-龥A-Za-z0-9/·]{2,18})/,
+      /职位[名称岗位]?[：:]\s*([一-龥A-Za-z0-9/·]{2,18})/,                 // 仅当「职位：xxx」显式带冒号，排除「职位描述」误抓
       /([一-龥A-Za-z0-9/·]{2,12}(?:运营|经理|工程师|专员|总监|主管|专家|顾问|BP|PM|代表|助理|负责人|策划|设计|分析师))(?!公司|集团)/
     ];
     r.position=kv(['岗位名','职位名','职位','岗位','职务','招聘岗位','招聘职位','岗位名称','职位名称'],30);
-    if(!r.position){ for(var k=0;k<posRe.length;k++){ var pm=text.match(posRe[k]); if(pm){ r.position=cleanStr(pm[1]||pm[0]); if(r.position.length>=2 && r.position.length<=18) break; } } }
+    if(!r.position){ for(var k=0;k<posRe.length;k++){ var pm=text.match(posRe[k]); if(pm){ r.position=cleanPos(pm[1]||pm[0]); if(r.position.length>=2 && r.position.length<=30 && !/描述|职责|要求|说明|关于|福利|简介|背景|亮点/.test(r.position)) break; } } }
     return r;
   }
   function applyJD(manual){
