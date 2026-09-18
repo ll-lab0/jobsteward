@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- 求职管家工作台 v69：Tab 改为分段控制器(浅灰容器+白底选中,去蓝)；IO 栏=导出备份/导入备份/导出表格；云同步上标题栏+一键录入卡片内手动新增；一键录入提示归位输入框；v65 提示自动消失/求职周期等保留。-->
+<!-- 求职管家工作台 v70：新增图片OCR录入——三个录入入口(内联卡片/收起弹窗/大弹窗JD框)支持上传JD截图，Tesseract.js纯前端识别(chi_sim+eng)后自动填充并触发一键录入或识别填充；零密钥零后端。-->
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
@@ -77,6 +77,13 @@ document.addEventListener('touchmove', function(e){ if(e.touches.length > 1){ e.
   .qa-modal .qa-btn{min-height:50px;padding:0 28px;font-size:16px;border-radius:12px;}
   .qa-btn-secondary{flex:0 0 auto;background:#fff;color:#16a34a;border:1px solid #bbf7d0;border-radius:12px;min-height:50px;padding:0 24px;font-size:15px;font-weight:700;white-space:nowrap;cursor:pointer;touch-action:manipulation;}
   .qa-btn-secondary:active{background:#f0fdf4;}
+  .qa-img-row{display:flex;align-items:center;gap:10px;margin-top:8px;flex-wrap:wrap;}
+  .qa-img-btn{flex:0 0 auto;display:inline-flex;align-items:center;gap:6px;background:#fff;color:#2f6bff;border:1px solid #c7d6ff;border-radius:10px;min-height:38px;padding:0 14px;font-size:13.5px;font-weight:600;white-space:nowrap;cursor:pointer;touch-action:manipulation;}
+  .qa-img-btn:active{background:#eef3ff;}
+  .qa-img-btn[disabled]{opacity:.55;cursor:default;}
+  .qa-img-msg{font-size:12.5px;color:#8a9099;line-height:1.4;}
+  .qa-img-msg.busy{color:#2f6bff;}
+  .qa-img-msg.err{color:#c0392b;}
   /* 全局操作层：云同步 / 导出表格 / 导出备份 / 导入备份，置于 Tab 之上，与视图切换分层；图标+分组 */
   .global-bar{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:8px;margin-bottom:18px;flex-wrap:wrap;}
   #ioWrap{display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap;}
@@ -469,6 +476,11 @@ document.addEventListener('touchmove', function(e){ if(e.touches.length > 1){ e.
     </div>
     <div class="qa-field">
       <textarea id="qaJd" class="qa-jd" placeholder="把招聘 JD 整段粘贴到这里，自动识别公司 / 职位 / 薪资，并直接生成一条岗位记录（免手动确认）"></textarea>
+      <div class="qa-img-row">
+        <button type="button" class="qa-img-btn" id="qaImgBtn">📷 上传JD图片识别</button>
+        <span class="qa-img-msg" id="qaImgMsg"></span>
+      </div>
+      <input type="file" id="qaImgFile" accept="image/*" capture="environment" hidden>
       <div class="qa-msg" id="qaMsg"></div>
     </div>
     <div class="qa-actions">
@@ -505,6 +517,11 @@ document.addEventListener('touchmove', function(e){ if(e.touches.length > 1){ e.
           <button type="button" id="jdParseBtn" style="font-size:12px;padding:3px 10px;border:1px solid #2f6bff;background:#fff;color:#2f6bff;border-radius:8px;cursor:pointer;">识别填充</button>
         </label>
         <textarea id="jdInput" name="jd" placeholder="粘贴 JD 原文，离开此框自动识别公司 / 职位 / 薪资；也可点「识别填充」"></textarea>
+        <div class="qa-img-row">
+          <button type="button" class="qa-img-btn" id="jdImgBtn">📷 上传JD图片识别</button>
+          <span class="qa-img-msg" id="jdImgMsg"></span>
+        </div>
+        <input type="file" id="jdImgFile" accept="image/*" capture="environment" hidden>
         <div id="jdHint" style="display:none;font-size:12px;color:#1a8a55;background:#eafaf1;border:1px solid #b8ebcd;border-radius:8px;padding:6px 9px;margin-top:-4px;margin-bottom:8px;line-height:1.5;"></div>
         <label>公司名称 *</label>
         <input name="company" placeholder="如：某科技公司 / 某软件公司" required>
@@ -607,6 +624,11 @@ document.addEventListener('touchmove', function(e){ if(e.touches.length > 1){ e.
       </div>
       <div class="qa-field">
         <textarea id="qaJdM" class="qa-jd" placeholder="把招聘 JD 整段粘贴到这里，自动识别公司 / 职位 / 薪资，并直接生成一条岗位记录（免手动确认）"></textarea>
+        <div class="qa-img-row">
+          <button type="button" class="qa-img-btn" id="qaImgBtnM">📷 上传JD图片识别</button>
+          <span class="qa-img-msg" id="qaImgMsgM"></span>
+        </div>
+        <input type="file" id="qaImgFileM" accept="image/*" capture="environment" hidden>
         <div class="qa-msg" id="qaMsgM"></div>
       </div>
       <div class="qa-actions">
@@ -1968,6 +1990,69 @@ document.addEventListener('touchmove', function(e){ if(e.touches.length > 1){ e.
   }
   makeEntry({jd:document.getElementById('qaJd'), btn:document.getElementById('qaBtn'), msg:document.getElementById('qaMsg'), onSuccess:function(){ modalConfirm('已录入岗位，请在列表里查看！','确认'); setScrollY(0, true); }});
   makeEntry({jd:document.getElementById('qaJdM'), btn:document.getElementById('qaBtnM'), msg:document.getElementById('qaMsgM'), onSuccess:function(){ var m=document.getElementById('qaModal'); if(m) m.classList.remove('show'); modalConfirm('已录入岗位，请在列表里查看！','确认'); }});
+
+  // ===== 图片 OCR 录入（Tesseract.js 纯前端，零密钥零后端） =====
+  function loadTesseract(cb){
+    if(window.Tesseract){ cb(); return; }
+    var s=document.createElement('script');
+    s.src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+    s.onload=function(){ cb(); };
+    s.onerror=function(){ cb(new Error('OCR 组件加载失败')); };
+    document.head.appendChild(s);
+  }
+  function runOCR(file, onProgress, onDone, onError){
+    loadTesseract(function(){
+      if(!window.Tesseract){ onError('OCR 组件不可用，请检查网络后刷新页面，或手动粘贴 JD 文字。'); return; }
+      try{
+        Tesseract.recognize(file, 'chi_sim+eng', { logger:function(m){
+          if(m && m.status==='recognizing text'){ onProgress(Math.round((m.progress||0)*100)); }
+        }})
+        .then(function(res){ onDone((res && res.data && res.data.text) || ''); })
+        .catch(function(e){ onError('OCR 识别失败：'+((e&&e.message)?e.message:e)); });
+      }catch(e){ onError('OCR 启动失败：'+((e&&e.message)?e.message:e)); }
+    });
+  }
+  // 绑定一个图片录入入口；mode: 'entry' 填充后自动一键录入(建记录) / 'form' 填充 JD 原文并触发识别填充(预览)
+  function wireOCR(btnId, fileId, msgId, mode){
+    var btn=document.getElementById(btnId);
+    var file=document.getElementById(fileId);
+    var msg=document.getElementById(msgId);
+    if(!btn||!file) return;
+    function setMsg(txt, cls){ if(msg){ msg.className='qa-img-msg'+(cls?(' '+cls):''); msg.textContent=txt; } }
+    btn.addEventListener('click', function(){ if(btn.disabled) return; try{ file.value=''; }catch(e){} file.click(); });
+    file.addEventListener('change', function(){
+      var f=file.files && file.files[0];
+      if(!f){ return; }
+      btn.disabled=true;
+      setMsg('识别中 0%…', 'busy');
+      runOCR(f,
+        function(pct){ setMsg('识别中 '+pct+'%…', 'busy'); },
+        function(text){
+          btn.disabled=false;
+          var clean=(text||'').replace(/\r/g,'').trim();
+          if(!clean){ setMsg('未识别到文字，请换清晰图片或手动粘贴。', 'err'); return; }
+          if(mode==='entry'){
+            var isM = (btnId==='qaImgBtnM');
+            var ta = document.getElementById(isM?'qaJdM':'qaJd');
+            var submit = document.getElementById(isM?'qaBtnM':'qaBtn');
+            if(ta){ ta.value=clean; }
+            setMsg('识别完成，正在自动录入…');
+            if(submit){ submit.click(); }   // 触发 makeEntry.run → 自动建记录(公司/职位/薪资/JD原文)
+            else { setMsg('识别完成，已填入文本框，请点「一键录入岗位」。'); }
+          } else {
+            var jd=document.getElementById('jdInput');
+            if(jd){ jd.value=clean; }
+            setMsg('识别完成，已填充 JD 原文并尝试识别公司/职位/薪资。');
+            if(typeof applyJD==='function'){ try{ applyJD(false); }catch(e){} }
+          }
+        },
+        function(errTxt){ btn.disabled=false; setMsg(errTxt, 'err'); }
+      );
+    });
+  }
+  wireOCR('qaImgBtn', 'qaImgFile', 'qaImgMsg', 'entry');
+  wireOCR('qaImgBtnM', 'qaImgFileM', 'qaImgMsgM', 'entry');
+  wireOCR('jdImgBtn', 'jdImgFile', 'jdImgMsg', 'form');
 
   // 一键录入：收起 / 悬浮按钮 / 弹窗
   var QA_COLLAPSED_KEY='jobTracker.qaCollapsed';
