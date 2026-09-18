@@ -1858,10 +1858,22 @@ document.addEventListener('touchmove', function(e){ if(e.touches.length > 1){ e.
       /([一-龥A-Za-z0-9（）()·&．]{2,16}(?:科技|技术|网络|信息技术|信息|咨询|实业|控股))/
     ];
     r.company=kv(['公司名','公司','公司名称','雇主','用人单位'],30);
-    // 首行启发式：JD 首行常是「XX公司 招聘 / XX正在招聘」或纯公司名
+    // 招聘行启发式：含「招聘」的行即公司名。首行常有 AI 转述残留（如「以下是完整版（已补全公司名称）：」），故遍历全文找招聘行
+    if(!r.company){
+      var lines=text.split(/\r?\n/).map(function(s){return s.trim();}).filter(Boolean);
+      for(var li=0; li<lines.length; li++){
+        var ln=lines[li];
+        if(/招聘/.test(ln) && !/^#/.test(ln)){
+          var lm=ln.match(/^(.+?)(?:正在)?招聘/);
+          var lc=stripMd(lm?lm[1]:ln).replace(/[：:].*$/,'').trim();
+          if(lc.length>=2 && lc.length<=24 && !badCompany(lc)){ r.company=lc; break; }
+        }
+      }
+    }
+    // 兜底：无招聘行时取首行纯公司名，但排除 AI 转述残留（以下是/完整版/补全…）
     if(!r.company){
       var fl=(text.split(/\r?\n/).map(function(s){return s.trim();}).filter(Boolean)[0]||'');
-      if(fl && !/^#/.test(fl)){
+      if(fl && !/^#/.test(fl) && !/以下是|完整版|补全|转述|原文|整理|生成|如下/.test(fl)){
         var fm=fl.match(/^(.+?)(?:正在)?招聘/);
         var fc=stripMd(fm?fm[1]:fl).replace(/[：:].*$/,'');
         if(fc.length>=2 && fc.length<=24 && !badCompany(fc)) r.company=fc;
