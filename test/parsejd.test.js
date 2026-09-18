@@ -40,6 +40,7 @@ function extractFn(src, name) {
 eval(extractFn(html, 'cleanStr'));
 eval(extractFn(html, 'stripMd'));
 eval(extractFn(html, 'cleanPos'));
+eval(extractFn(html, 'fixOcrSpacing'));
 eval(extractFn(html, 'parseJD'));
 
 // ---- 覆盖各类 JD 形态的用例（公司名识别是本次重点）----
@@ -128,4 +129,38 @@ for (const c of cases) {
 }
 
 console.log('\n结果: ' + pass + ' 通过 / ' + fail + ' 失败');
+
+// ---- OCR 间距场景：模拟 Tesseract 中文逐字加空格的输出 ----
+// 这是 v72 修复的 bug：OCR 把「正在招聘」识别成「正 在 招 聘」，导致正则
+// 匹配不到、公司/职位全失效。fixOcrSpacing 须折叠 CJK 间空格且保留换行。
+const ocrCases = [
+  {
+    name: 'K OCR逐字空格·多行排版JD（直白美学/FDE前置交付工程师）',
+    jd: '直 白 美 学 正 在 招 聘\nFDE 前 置 交 付 工 程 师\n北 京 /25-35K/ 经 验 不 限 /本 科\n职 位 详 情\n我 们 是 一 家 正 在 成 长 中 的 新 消 费 医 美 平台',
+    expect: { company: '直白美学', position: 'FDE 前置交付工程师', salary: '25-35K' }
+  },
+  {
+    name: 'L OCR逐字空格·月之暗面（验证换行不被连成一行）',
+    jd: '以 下 是 完 整 版\n**月 之 暗 面（Moonshot AI）正 在 招 聘**\n# AI Operations Builder\n35-55K',
+    expect: { company: '月之暗面（Moonshot AI）', position: 'AI Operations Builder', salary: '35-55K' }
+  }
+];
+
+console.log('\nparseJD + fixOcrSpacing（OCR 间距）— 用例数 ' + ocrCases.length);
+for (const c of ocrCases) {
+  const r = parseJD(fixOcrSpacing(c.jd));
+  const fields = ['company', 'position', 'salary'];
+  let ok = true;
+  const diffs = [];
+  for (const f of fields) {
+    if (r[f] !== c.expect[f]) {
+      ok = false;
+      diffs.push('  ' + f + ': 期望 ' + JSON.stringify(c.expect[f]) + ' / 实际 ' + JSON.stringify(r[f]));
+    }
+  }
+  if (ok) { pass++; console.log('  ✅ ' + c.name); }
+  else { fail++; console.log('  ❌ ' + c.name); diffs.forEach(d => console.log(d)); }
+}
+
+console.log('\n结果(含OCR): ' + pass + ' 通过 / ' + fail + ' 失败');
 process.exit(fail === 0 ? 0 : 1);
