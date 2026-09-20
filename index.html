@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- 求职管家工作台 v72：OCR改进——① 复用worker(首张后变快)；② 折叠CJK逐字空格(fixOcrSpacing)修复Tesseract中文"正 在 招 聘"乱空格+换行；③ 新增"招聘行后首行=职位名"启发式，修正多行排版JD(如"FDE前置交付工程师")职位识别失败。-->
+<!-- 求职管家工作台 v73：求职日历新增「打招呼」维度——① 数据模型新增打招呼日期字段(表单/编辑/CSV导出/云端同步签名全覆盖)；② 日历格按天显示"招 N"徽标+图例+当日明细(打招呼/投递/面试三栏)；③ 卡片新增一键「打招呼」按钮(标记今天+待打招呼→待投)与卡片底栏"招 日期"提示。-->
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
@@ -249,6 +249,8 @@ document.addEventListener('touchmove', function(e){ if(e.touches.length > 1){ e.
   .card-actions button.edit-btn:active{background:#f3f4f6;}
   .card-actions button.del-btn{background:transparent;color:#e5484d;border-color:#ffd0d0;}
   .card-actions button.del-btn:active{background:#fff0f0;}
+  .card-actions button.greet-btn{background:#eafaf0;color:#16824f;border-color:#bde9cf;font-weight:600;}
+  .card-actions button.greet-btn:active{background:#d7f2e2;border-color:#a3ddc0;}
   /* 窄屏：四按钮强制一行紧凑排布，压缩其他按钮给状态选择器让位，保证状态文案不截断 */
   @media (max-width:480px){
     .card-actions{gap:6px;}
@@ -396,17 +398,20 @@ document.addEventListener('touchmove', function(e){ if(e.touches.length > 1){ e.
   .cal-badge{font-size:10px;line-height:1.2;margin-top:2px;border-radius:5px;padding:2px 4px;display:block;white-space:normal;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;max-width:100%;}
   .cal-badge.cal-deliver{background:#e7f7ee;color:#16824f;font-weight:600;}
   .cal-badge.cal-interview{background:#fff1e0;color:#cf6f0a;font-weight:600;}
+  .cal-badge.cal-greet{background:#eef0ff;color:#4c5bd4;font-weight:600;}
   .cal-legend{display:flex;gap:16px;align-items:center;margin:14px 4px 2px;font-size:12px;color:#6b7280;}
   .cal-leg-item{display:flex;align-items:center;gap:6px;}
   .cal-dot{width:10px;height:10px;border-radius:3px;display:inline-block;}
   .cal-dot-deliver{background:#16824f;}
   .cal-dot-interview{background:#cf6f0a;}
+  .cal-dot-greet{background:#4c5bd4;}
   .cal-note{font-size:12px;color:#9aa3af;margin:10px 2px;}
   .cal-cell.cal-active{background:linear-gradient(180deg,#2f6bff,#4c84ff)!important;border-color:#2f6bff!important;color:#fff!important;box-shadow:0 4px 14px rgba(47,107,255,.28)!important;z-index:2;}
   .cal-cell.cal-active .cal-date{color:#fff!important;}
   .cal-cell.cal-active .cal-today-label{background:#fff!important;color:#2f6bff!important;}
   .cal-cell.cal-active .cal-badge.cal-deliver{background:rgba(255,255,255,.22)!important;color:#fff!important;}
   .cal-cell.cal-active .cal-badge.cal-interview{background:rgba(255,255,255,.22)!important;color:#fff!important;}
+  .cal-cell.cal-active .cal-badge.cal-greet{background:rgba(255,255,255,.22)!important;color:#fff!important;}
   .cal-detail-inline{grid-column:1 / -1;background:#f8fbff;border:1px solid #eef5ff;border-radius:10px;padding:12px 14px;margin:2px 8px 8px;box-shadow:0 1px 2px rgba(47,107,255,.03);animation:calFade .18s ease-out;}
   @keyframes calFade{from{opacity:0;transform:translateY(-6px);}to{opacity:1;transform:translateY(0);}}
   .cal-detail-inline-title{font-size:14px;font-weight:700;color:#1f2a44;margin-bottom:10px;display:flex;align-items:center;gap:8px;}
@@ -535,6 +540,8 @@ document.addEventListener('touchmove', function(e){ if(e.touches.length > 1){ e.
         <label>投递状态</label>
         <div class="status-dd form-status-dd" id="formStatusDd"></div>
         <input type="hidden" name="status" id="formStatusInput">
+        <label>打招呼日期（选填）</label>
+        <input type="date" name="greetDate" placeholder="实际打招呼当天">
         <label>投递日期（选填）</label>
         <input type="date" name="deliverDate" placeholder="实际投递当天">
         <label>面试日期（选填）</label>
@@ -1008,7 +1015,7 @@ document.addEventListener('touchmove', function(e){ if(e.touches.length > 1){ e.
     if(!gh.enabled || document.hidden) return;
     ghFetch().then(function(cloud){
       if(!cloud || !cloud.length) return;
-      var sig=function(){ return activeRows().map(function(r){ return r.id+'|'+(r['更新时间']||'')+'|'+(r._deleted?'D':'')+'|'+(r['投递日期']||'')+'|'+(r['面试日期']||''); }).sort().join(''); };
+      var sig=function(){ return activeRows().map(function(r){ return r.id+'|'+(r['更新时间']||'')+'|'+(r._deleted?'D':'')+'|'+(r['打招呼日期']||'')+'|'+(r['投递日期']||'')+'|'+(r['面试日期']||''); }).sort().join(''); };
       var before=sig();
       allRows=mergeByUpdated(allRows, cloud); normalizeRows(allRows); lsSave(allRows);
       if(before!==sig()){ buildFilters(); render(); setSync('已自动拉取其他设备更新','success'); }
@@ -1526,6 +1533,9 @@ document.addEventListener('touchmove', function(e){ if(e.touches.length > 1){ e.
     Array.prototype.forEach.call(list.querySelectorAll('.pitch-btn'),function(b){
       b.addEventListener('click',function(){ openPitchEditor(b.getAttribute('data-id')); });
     });
+    Array.prototype.forEach.call(list.querySelectorAll('.greet-btn'),function(b){
+      b.addEventListener('click',function(){ markGreeting(b.getAttribute('data-id')); });
+    });
   }
 
   // ===== 数据看板（回顾 / 看板）=====
@@ -1558,10 +1568,12 @@ document.addEventListener('touchmove', function(e){ if(e.touches.length > 1){ e.
     var rows=activeRows();
     var map={};
     rows.forEach(function(r){
+      var gd=(r['打招呼日期']||'').trim();
+      if(gd){ if(!map[gd]) map[gd]={deliver:[],interview:[],greet:[]}; map[gd].greet.push(r); }
       var d=(r['投递日期']||'').trim();
-      if(d){ if(!map[d]) map[d]={deliver:[],interview:[]}; map[d].deliver.push(r); }
+      if(d){ if(!map[d]) map[d]={deliver:[],interview:[],greet:[]}; map[d].deliver.push(r); }
       var iv=(r['面试日期']||'').trim();
-      if(iv){ if(!map[iv]) map[iv]={deliver:[],interview:[]}; map[iv].interview.push(r); }
+      if(iv){ if(!map[iv]) map[iv]={deliver:[],interview:[],greet:[]}; map[iv].interview.push(r); }
     });
     var y=calState.year, m=calState.month;
     var first=new Date(y,m,1);
@@ -1579,18 +1591,20 @@ document.addEventListener('touchmove', function(e){ if(e.touches.length > 1){ e.
       var has=c.info;
       var dn=has?has.deliver.length:0;
       var inN=has?has.interview.length:0;
-      var cls='cal-cell'+(dn||inN?' cal-has':'');
+      var gn=has?has.greet.length:0;
+      var cls='cal-cell'+((dn||inN||gn)?' cal-has':'');
       var t=new Date(); var isToday=(t.getFullYear()===y&&t.getMonth()===m&&t.getDate()===c.d);
       if(isToday) cls+=' cal-today-cell';
       html+='<div class="'+cls+'" data-key="'+c.key+'">';
       html+='<div class="cal-date">'+(isToday?'<span class="cal-today-label">今</span>':'')+'<span>'+c.d+'</span></div>';
+      if(gn){ html+='<div class="cal-badge cal-greet" title="打招呼 '+gn+' 家">招 '+gn+'</div>'; }
       if(dn){ html+='<div class="cal-badge cal-deliver" title="投递 '+dn+' 份">投 '+dn+'</div>'; }
       if(inN){ html+='<div class="cal-badge cal-interview" title="面试 '+inN+' 家">面 '+inN+'</div>'; }
       html+='</div>';
     });
     html+='</div>';
-    html+='<div class="cal-legend"><span class="cal-leg-item"><i class="cal-dot cal-dot-deliver"></i>投递记录</span><span class="cal-leg-item"><i class="cal-dot cal-dot-interview"></i>面试安排</span></div>';
-    html+='<div class="cal-note">仅显示填了「投递日期 / 面试日期」的日期；<br>点某天看当天明细，历史记录可在「编辑」里补填日期。</div>';
+    html+='<div class="cal-legend"><span class="cal-leg-item"><i class="cal-dot cal-dot-greet"></i>打招呼</span><span class="cal-leg-item"><i class="cal-dot cal-dot-deliver"></i>投递记录</span><span class="cal-leg-item"><i class="cal-dot cal-dot-interview"></i>面试安排</span></div>';
+    html+='<div class="cal-note">仅显示填了「打招呼 / 投递 / 面试」日期的日期；<br>在卡片点「打招呼」即可一键记今天，或去「编辑」补填具体日期。</div>';
     cv.innerHTML=html;
     var prev=document.getElementById('calPrev'); if(prev) prev.onclick=function(){ calState.month--; if(calState.month<0){calState.month=11;calState.year--;} renderCalendar(); };
     var next=document.getElementById('calNext'); if(next) next.onclick=function(){ calState.month++; if(calState.month>11){calState.month=0;calState.year++;} renderCalendar(); };
@@ -1610,10 +1624,16 @@ document.addEventListener('touchmove', function(e){ if(e.touches.length > 1){ e.
     closeCalDetail();
     cell.classList.add('cal-active');
     var rows=activeRows();
+    var greet=rows.filter(function(r){return (r['打招呼日期']||'').trim()===key;});
     var deliver=rows.filter(function(r){return (r['投递日期']||'').trim()===key;});
     var interview=rows.filter(function(r){return (r['面试日期']||'').trim()===key;});
     var html='<div class="cal-detail-inline" data-detail-key="'+key+'">';
     html+='<div class="cal-detail-inline-title">'+key+' 求职行程</div>';
+    if(greet.length){
+      html+='<div class="cal-detail-inline-sec"><h4>打招呼（'+greet.length+' 家）</h4>';
+      greet.forEach(function(r){ html+='<div class="cal-detail-inline-row" data-edit-id="'+esc(r.id)+'" data-edit-field="greetDate"><b>'+(r['公司']||'未填公司')+'</b><span>'+(r['职位']||'')+'</span><span class="cal-detail-inline-st">'+(r['投递状态']||'')+'</span></div>'; });
+      html+='</div>';
+    }
     if(deliver.length){
       html+='<div class="cal-detail-inline-sec"><h4>投递（'+deliver.length+' 份）</h4>';
       deliver.forEach(function(r){ html+='<div class="cal-detail-inline-row" data-edit-id="'+esc(r.id)+'" data-edit-field="deliverDate"><b>'+(r['公司']||'未填公司')+'</b><span>'+(r['职位']||'')+'</span><span class="cal-detail-inline-st">'+(r['投递状态']||'')+'</span></div>'; });
@@ -1624,7 +1644,7 @@ document.addEventListener('touchmove', function(e){ if(e.touches.length > 1){ e.
       interview.forEach(function(r){ html+='<div class="cal-detail-inline-row" data-edit-id="'+esc(r.id)+'" data-edit-field="interviewDate"><b>'+(r['公司']||'未填公司')+'</b><span>'+(r['职位']||'')+'</span><span class="cal-detail-inline-st">'+(r['投递状态']||'')+'</span></div>'; });
       html+='</div>';
     }
-    if(!deliver.length&&!interview.length){ html+='<div class="cal-detail-inline-empty">这一天没有投递 / 面试记录</div>'; }
+    if(!greet.length&&!deliver.length&&!interview.length){ html+='<div class="cal-detail-inline-empty">这一天没有打招呼 / 投递 / 面试记录</div>'; }
     html+='</div>';
     var wrap=document.createElement('div'); wrap.innerHTML=html;
     var detail=wrap.firstChild;
@@ -1749,6 +1769,21 @@ document.addEventListener('touchmove', function(e){ if(e.touches.length > 1){ e.
     mask.addEventListener('click',function(e){ if(e.target===mask){ /* 点遮罩不关，等按钮 */ } });
   }
 
+  // 一键记录「今天打了招呼」：卡片「打招呼」按钮触发；若已记过日期则提示不改写
+  function markGreeting(id){
+    var r=findById(id); if(!r) return;
+    var today=todayStr();
+    if(r['打招呼日期']){
+      showCopyToast('已于 '+r['打招呼日期']+' 记录打招呼');
+      return;
+    }
+    r['打招呼日期']=today;
+    if((r['投递状态']||'')==='待打招呼'){ r['投递状态']='待投'; }
+    r['更新时间']=nowStr();
+    upsert(r); loadData();
+    showCopyToast('已标记 '+today+' 打了招呼');
+  }
+
   function renderCard(r){
     var id = r.id;
     var st=r['投递状态']||'';
@@ -1784,11 +1819,12 @@ document.addEventListener('touchmove', function(e){ if(e.touches.length > 1){ e.
       + jdSec
       +'<div class="card-actions">'
         +'<div class="status-dd" data-id="'+esc(id)+'"></div>'
+        +'<button class="greet-btn" data-id="'+esc(id)+'">打招呼</button>'
         +'<button class="pitch-btn" data-id="'+esc(id)+'">写话术</button>'
         +'<button class="edit-btn" data-id="'+esc(id)+'">编辑</button>'
         +'<button class="del-btn" data-id="'+esc(id)+'">删除</button>'
       +'</div>'
-      +'<div class="card-foot">'+(cycleKey(r)?'录入 '+esc(cycleKey(r)):'')+(r['更新时间']?(' · 更新 '+esc((r['更新时间']||'').slice(0,10))):'')+'</div>'
+      +'<div class="card-foot">'+(cycleKey(r)?'录入 '+esc(cycleKey(r)):'')+(r['打招呼日期']?(' · 招 '+esc((r['打招呼日期']||'').slice(0,10))):'')+(r['更新时间']?(' · 更新 '+esc((r['更新时间']||'').slice(0,10))):'')+'</div>'
     +'</div>';
   }
 
@@ -1828,6 +1864,7 @@ document.addEventListener('touchmove', function(e){ if(e.touches.length > 1){ e.
     if(formStatusDd) setupStatusDropdown(formStatusDd,st,function(val){ if(formStatusInput) formStatusInput.value=val; clearTimeout(cacheTimer); cacheTimer=setTimeout(cacheSave,300); });
     form.pitch.value=r['打招呼话术']||'';
     form.jd.value=r['JD原文']||'';
+    form.greetDate.value=r['打招呼日期']||'';
     form.deliverDate.value=r['投递日期']||'';
     form.interviewDate.value=r['面试日期']||'';
     document.getElementById('formTitle').textContent='编辑岗位';
@@ -2205,6 +2242,7 @@ document.addEventListener('touchmove', function(e){ if(e.touches.length > 1){ e.
     rec['地点']=form.location.value.trim();
     rec['打招呼话术']=form.pitch.value;
     rec['JD原文']=form.jd.value;
+    rec['打招呼日期']=form.greetDate.value||'';
     rec['投递日期']=form.deliverDate.value||'';
     rec['面试日期']=form.interviewDate.value||'';
     if(!editingId){ rec['录入时间']=nowStr(); }
@@ -2295,7 +2333,7 @@ document.addEventListener('touchmove', function(e){ if(e.touches.length > 1){ e.
   }
   function exportExcel(){
     var rows=activeRows();
-    var headers=['公司','职位','投递状态','薪资','地点','录入时间','更新时间','打招呼话术','JD原文'];
+    var headers=['公司','职位','投递状态','薪资','地点','打招呼日期','录入时间','更新时间','打招呼话术','JD原文'];
     var lines=[headers.join(',')];
     rows.forEach(function(r){ lines.push(headers.map(function(h){ return csvCell(r[h]||''); }).join(',')); });
     var csv='﻿'+lines.join('\r\n'); // BOM 确保 Excel 正确识别 UTF-8
