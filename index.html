@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- 求职管家工作台 v261：求职日历新增「打招呼」维度（纠正此前误标的 v73；真实版本序列接续 v260）——① 数据模型新增打招呼日期字段(表单/编辑/CSV导出/云端同步签名全覆盖)；② 日历格按天显示"招 N"徽标+图例+当日明细(打招呼/投递/面试三栏)；③ 卡片新增一键「打招呼」按钮(标记今天+待打招呼→待投)与卡片底栏"招 日期"提示。-->
+<!-- 求职管家工作台 v262：电脑端弹窗垂直居中——新增 @media(min-width:481px) 专属块(mask 居中+modal margin:auto+max-height 防溢出)，手机端 <480px 规则原样不动。上一版 v261：求职日历新增「打招呼」维度（纠正此前误标的 v73；真实版本序列接续 v260）——① 数据模型新增打招呼日期字段(表单/编辑/CSV导出/云端同步签名全覆盖)；② 日历格按天显示"招 N"徽标+图例+当日明细(打招呼/投递/面试三栏)；③ 卡片新增一键「打招呼」按钮(标记今天+待打招呼→待投)与卡片底栏"招 日期"提示。-->
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
@@ -368,6 +368,13 @@ document.addEventListener('touchmove', function(e){ if(e.touches.length > 1){ e.
     .modal.modal-info{max-height:calc(100dvh - 80px);min-height:auto;overflow-y:auto;-webkit-overflow-scrolling:touch;}
     .sync-modal{max-height:calc(100dvh - 80px);}
     #ghModal.modal-mask{align-items:center;}
+  }
+  /* 电脑端弹窗垂直居中（≥481px；手机端 <480px 由上方媒体查询负责，互不影响） */
+  @media (min-width:481px){
+    .modal-mask{align-items:center;}
+    .modal{margin:auto;max-height:calc(100dvh - 48px);}
+    .modal.qa-modal{max-height:calc(100dvh - 80px);overflow-y:auto;}
+    .sync-modal{max-height:calc(100dvh - 80px);overflow-y:auto;}
   }
   /* 求职复盘 */
   #dashboardView{margin-top:-4px;}
