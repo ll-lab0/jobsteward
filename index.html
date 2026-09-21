@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- 求职管家工作台 v263：移除岗位卡片里的「打招呼」一键按钮(含其事件绑定/markGreeting函数/专属CSS)；卡片底栏「招 日期」文字提示保留，日历"打招呼日期"字段与求职日历"招 N"展示不受影响。-->
+<!-- 求职管家工作台 v266：JD OCR 折行合并泛化增强——① 标题白名单扩充(加中文冷门词:我们期待你/你将收获/加入我们… + 英文词:Requirements/Responsibilities/About Us/Job Description… + 大小写不敏感 i flag + 允许英文结尾标点)；② 分段条件加 OCR_TITLE.test(prev)，标题行与其下一行正文正确分段；③ ocrJoinMerged 加英文标点(.,;:!?)后接字母补空格(修 products.Requirements 缺空格)。仍不改任何文字、仅合并排版折行。-->
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
@@ -2052,6 +2052,36 @@ document.addEventListener('touchmove', function(e){ if(e.touches.length > 1){ e.
     text=text.replace(/([，。、；：（）()【】“”‘’·/／])[ \t]+([一-龥])/g,'$1$2');
     return text;
   }
+  // 折行合并：Tesseract 按视觉行输出，段落因排版折行会产生「段中换行」。
+  // 启发式(仅合并排版折行、不改文字，符合逐字抄录红线)：
+  //   分段信号＝当前行是条目(编号/项目符号/【)｜上一行是条目｜空行｜命中标题白名单(岗位职责/任职要求…)；
+  //   其余一律视为段中折行→合并(中英文/英文词间补空格，纯中文段中不补)。
+  //   已剔除旧版"上一行句号即分段"规则——句号在段中极常见，会误把同段折行切断。
+  var OCR_ITEM_START = /^([0-9]+[.、)）]|[(（][0-9]+[)）]|[①-⑳]|[\-·•*—◆▶▍▸■□●○]|【|〔|「)/;
+  var OCR_TITLE = /^(岗位职责|任职要求|任职资格|工作内容|工作要求|岗位要求|任职条件|公司福利|薪资福利|福利待遇|加分项|关于我们|公司介绍|岗位亮点|岗位描述|薪资待遇|职位描述|职位要求|职责描述|我们期待你|你将收获|加入我们|我们需要|公司优势|团队介绍|岗位诱惑|联系方式|工作地点|岗位概览|About\s*Us|Requirements?|Responsibilities|Qualifications|Job\s*Description|Preferred|Bonus|Benefits|Salary|Compensation|Who\s*You\s*Are|What\s*You.?ll\s*Do|We\s*Offer)\s*[：:，。.!?]?$/i;
+  function ocrJoinMerged(prev, cur){
+    var end=prev.slice(-1), start=cur.slice(0,1);
+    var cjk=/[一-龥]/, az=/[A-Za-z0-9]/, enPunct=/[.,;:!?]/;
+    if((cjk.test(end)&&az.test(start))||(az.test(end)&&cjk.test(start))||(az.test(end)&&az.test(start))||(enPunct.test(end)&&az.test(start))) return prev+' '+cur;
+    return prev+cur;
+  }
+  function reflowOcrLines(text){
+    if(!text) return text;
+    var raw=text.split(/\r?\n/), out=[], pendingBreak=false;
+    for(var i=0;i<raw.length;i++){
+      var line=raw[i].trim();
+      if(!line){ pendingBreak=true; continue; }
+      if(out.length===0){ out.push(line); pendingBreak=false; continue; }
+      var prev=out[out.length-1];
+      if(OCR_ITEM_START.test(line) || OCR_ITEM_START.test(prev) || pendingBreak || OCR_TITLE.test(line) || OCR_TITLE.test(prev)){
+        out.push('\n'); out.push(line);
+      } else {
+        out[out.length-1]=ocrJoinMerged(prev, line);
+      }
+      pendingBreak=false;
+    }
+    return out.join('');
+  }
   function getOcrWorker(){
     if(ocrWorker) return Promise.resolve(ocrWorker);
     if(ocrWorkerLoading) return ocrWorkerLoading;
@@ -2065,7 +2095,7 @@ document.addEventListener('touchmove', function(e){ if(e.touches.length > 1){ e.
       try{
         ocrProgressCb=onProgress;
         getOcrWorker().then(function(w){ return w.recognize(file); })
-          .then(function(res){ onDone(fixOcrSpacing((res && res.data && res.data.text) || '')); })
+          .then(function(res){ onDone(reflowOcrLines(fixOcrSpacing((res && res.data && res.data.text) || ''))); })
           .catch(function(e){ onError('OCR 识别失败：'+((e&&e.message)?e.message:e)); });
       }catch(e){ onError('OCR 启动失败：'+((e&&e.message)?e.message:e)); }
     });
