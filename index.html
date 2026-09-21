@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- 求职管家工作台 v266：JD OCR 折行合并泛化增强——① 标题白名单扩充(加中文冷门词:我们期待你/你将收获/加入我们… + 英文词:Requirements/Responsibilities/About Us/Job Description… + 大小写不敏感 i flag + 允许英文结尾标点)；② 分段条件加 OCR_TITLE.test(prev)，标题行与其下一行正文正确分段；③ ocrJoinMerged 加英文标点(.,;:!?)后接字母补空格(修 products.Requirements 缺空格)。仍不改任何文字、仅合并排版折行。-->
+<!-- 求职管家工作台 v270：OCR 识别精度优化(一+二层)——① 预处理：智能缩放(大图缩到长边2200提速/小图放大提精度) + 灰度 + Otsu+ISODATA 二值化(黑字白底，暗底自动反转、阈值退化回退灰度)，输出 PNG 无损；② Tesseract 参数 psm=6(统一文本块) 替代默认 psm=3(自动版面分析)，单栏密集 JD 文本又快又准。仅提升识别质量，不改任何识别出的文字(符合逐字抄录红线)。前置 v267 文案/v268 胶囊计数/v269 折行合并与进度条。-->
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
@@ -779,6 +779,14 @@ document.addEventListener('touchmove', function(e){ if(e.touches.length > 1){ e.
     if(/^\d{4} Q\d$/.test(key)) return quarterKey(r)===key;
     return cycleKey(r)===key; // 按月
   }
+  // 胶囊计数口径：按「周期+搜索」过滤（不含状态），与列表展示范围一致——
+  // 选了 2026-09，状态胶囊上的数字就只统计 9 月（且命中搜索词）的记录。
+  function scopeRows(){
+    var rows=activeRows();
+    if(periodFilter) rows=rows.filter(function(r){ return rowMatchesPeriod(r, periodFilter); });
+    if(searchTerm){ var t=searchTerm.toLowerCase(); rows=rows.filter(function(r){ return (r['公司']||'').toLowerCase().indexOf(t)>=0 || (r['职位']||'').toLowerCase().indexOf(t)>=0; }); }
+    return rows;
+  }
   // 当前季度 key（如 2026 Q3）
   function currentQuarterKey(){ var d=new Date(); var y=d.getFullYear(); var m=d.getMonth()+1; return y+' Q'+Math.ceil(m/3); }
   // 判断某个年月（2026-08）是否落在周期 key（年/季/月）内
@@ -1393,10 +1401,10 @@ document.addEventListener('touchmove', function(e){ if(e.touches.length > 1){ e.
   function buildFilters(){
     var box=document.getElementById('filters');
     var counts={}; STATUS_LIST.forEach(function(t){ counts[t]=0; });
-    activeRows().forEach(function(r){ var st=r['投递状态']||''; if(counts.hasOwnProperty(st)) counts[st]++; });
+    scopeRows().forEach(function(r){ var st=r['投递状态']||''; if(counts.hasOwnProperty(st)) counts[st]++; });
     var arr=[{text:'全部',f:'all'}].concat(STATUS_LIST.map(function(t){ return {text:t,f:t}; }));
     box.innerHTML=arr.map(function(o){
-      var cnt=(o.f==='all')?activeRows().length:(counts[o.text]||0);
+      var cnt=(o.f==='all')?scopeRows().length:(counts[o.text]||0);
       return '<button data-f="'+esc(o.f)+'" class="'+(o.f===statusFilter?'on':'')+'">'+esc(o.text)+' <span class="f-cnt">'+cnt+'</span></button>';
     }).join('');
     Array.prototype.forEach.call(box.querySelectorAll('button'),function(b){
@@ -1471,7 +1479,7 @@ document.addEventListener('touchmove', function(e){ if(e.touches.length > 1){ e.
         });
         wrap.classList.remove('open'); menu.hidden=true;
         toggle.blur();
-        render(); if(viewMode==='dash') renderDashboard();
+        buildFilters(); render(); if(viewMode==='dash') renderDashboard();
       });
     });
     // 点击周期下拉之外区域时收起（不依赖全局 closeAllStatusDd，确保点别处也能收起）
@@ -1493,7 +1501,7 @@ document.addEventListener('touchmove', function(e){ if(e.touches.length > 1){ e.
 
   function render(){
     var counts={}; STATUS_LIST.forEach(function(t){ counts[t]=0; });
-    activeRows().forEach(function(r){
+    scopeRows().forEach(function(r){
       var st=r['投递状态']||'';
       if(counts.hasOwnProperty(st)) counts[st]++;
     });
@@ -1599,7 +1607,7 @@ document.addEventListener('touchmove', function(e){ if(e.touches.length > 1){ e.
       if(isToday) cls+=' cal-today-cell';
       html+='<div class="'+cls+'" data-key="'+c.key+'">';
       html+='<div class="cal-date">'+(isToday?'<span class="cal-today-label">今</span>':'')+'<span>'+c.d+'</span></div>';
-      if(gn){ html+='<div class="cal-badge cal-greet" title="打招呼 '+gn+' 家">招 '+gn+'</div>'; }
+      if(gn){ html+='<div class="cal-badge cal-greet" title="打招呼 '+gn+' 家">招呼 '+gn+'</div>'; }
       if(dn){ html+='<div class="cal-badge cal-deliver" title="投递 '+dn+' 份">投 '+dn+'</div>'; }
       if(inN){ html+='<div class="cal-badge cal-interview" title="面试 '+inN+' 家">面 '+inN+'</div>'; }
       html+='</div>';
@@ -1630,7 +1638,7 @@ document.addEventListener('touchmove', function(e){ if(e.touches.length > 1){ e.
     var deliver=rows.filter(function(r){return (r['投递日期']||'').trim()===key;});
     var interview=rows.filter(function(r){return (r['面试日期']||'').trim()===key;});
     var html='<div class="cal-detail-inline" data-detail-key="'+key+'">';
-    html+='<div class="cal-detail-inline-title">'+key+' 求职行程</div>';
+    html+='<div class="cal-detail-inline-title">'+key+' 求职记录</div>';
     if(greet.length){
       html+='<div class="cal-detail-inline-sec"><h4>打招呼（'+greet.length+' 家）</h4>';
       greet.forEach(function(r){ html+='<div class="cal-detail-inline-row" data-edit-id="'+esc(r.id)+'" data-edit-field="greetDate"><b>'+(r['公司']||'未填公司')+'</b><span>'+(r['职位']||'')+'</span><span class="cal-detail-inline-st">'+(r['投递状态']||'')+'</span></div>'; });
@@ -1810,7 +1818,7 @@ document.addEventListener('touchmove', function(e){ if(e.touches.length > 1){ e.
         +'<button class="edit-btn" data-id="'+esc(id)+'">编辑</button>'
         +'<button class="del-btn" data-id="'+esc(id)+'">删除</button>'
       +'</div>'
-      +'<div class="card-foot">'+(cycleKey(r)?'录入 '+esc(cycleKey(r)):'')+(r['打招呼日期']?(' · 招 '+esc((r['打招呼日期']||'').slice(0,10))):'')+(r['更新时间']?(' · 更新 '+esc((r['更新时间']||'').slice(0,10))):'')+'</div>'
+      +'<div class="card-foot">'+(cycleKey(r)?'录入 '+esc(cycleKey(r)):'')+(r['打招呼日期']?(' · 招呼 '+esc((r['打招呼日期']||'').slice(0,10))):'')+(r['更新时间']?(' · 更新 '+esc((r['更新时间']||'').slice(0,10))):'')+'</div>'
     +'</div>';
   }
 
@@ -2034,7 +2042,7 @@ document.addEventListener('touchmove', function(e){ if(e.touches.length > 1){ e.
 
   // ===== 图片 OCR 录入（Tesseract.js 纯前端，零密钥零后端） =====
   // 复用同一个 worker：首张识别慢（需下载并初始化语言包），之后复用不再重加载，明显变快
-  var ocrWorker=null, ocrWorkerLoading=null, ocrProgressCb=null;
+  var ocrWorker=null, ocrWorkerLoading=null, ocrProgressCb=null, ocrPhaseCb=null;
   function loadTesseract(cb){
     if(window.Tesseract){ cb(); return; }
     var s=document.createElement('script');
@@ -2059,6 +2067,8 @@ document.addEventListener('touchmove', function(e){ if(e.touches.length > 1){ e.
   //   已剔除旧版"上一行句号即分段"规则——句号在段中极常见，会误把同段折行切断。
   var OCR_ITEM_START = /^([0-9]+[.、)）]|[(（][0-9]+[)）]|[①-⑳]|[\-·•*—◆▶▍▸■□●○]|【|〔|「)/;
   var OCR_TITLE = /^(岗位职责|任职要求|任职资格|工作内容|工作要求|岗位要求|任职条件|公司福利|薪资福利|福利待遇|加分项|关于我们|公司介绍|岗位亮点|岗位描述|薪资待遇|职位描述|职位要求|职责描述|我们期待你|你将收获|加入我们|我们需要|公司优势|团队介绍|岗位诱惑|联系方式|工作地点|岗位概览|About\s*Us|Requirements?|Responsibilities|Qualifications|Job\s*Description|Preferred|Bonus|Benefits|Salary|Compensation|Who\s*You\s*Are|What\s*You.?ll\s*Do|We\s*Offer)\s*[：:，。.!?]?$/i;
+  var OCR_SENT_END = /[。！？；]$/;
+  var OCR_WRAP_MID = /[，、：,]$/; // 行尾是逗号/顿号/冒号→明显没说完，是被折断的
   function ocrJoinMerged(prev, cur){
     var end=prev.slice(-1), start=cur.slice(0,1);
     var cjk=/[一-龥]/, az=/[A-Za-z0-9]/, enPunct=/[.,;:!?]/;
@@ -2068,12 +2078,20 @@ document.addEventListener('touchmove', function(e){ if(e.touches.length > 1){ e.
   function reflowOcrLines(text){
     if(!text) return text;
     var raw=text.split(/\r?\n/), out=[], pendingBreak=false;
+    // 上一行是条目但「够长且未以句末标点结尾」→ 大概率是被排版折断的长条目，应与下一行合并；
+    // 短条目(如「· 协同跨部门资源」)仍分段，防止误并后面的标题。
+    function prevShortItem(prev){
+      if(!OCR_ITEM_START.test(prev)) return false;
+      if(OCR_SENT_END.test(prev)) return true;
+      var body=prev.replace(/^([0-9]+[.、)）]|[(（][0-9]+[)）]|[①-⑳]|[\-·•*—◆▶▍▸■□●○]|【|〔|「)/,'');
+      return body.length<14 && !OCR_WRAP_MID.test(body);
+    }
     for(var i=0;i<raw.length;i++){
       var line=raw[i].trim();
       if(!line){ pendingBreak=true; continue; }
       if(out.length===0){ out.push(line); pendingBreak=false; continue; }
       var prev=out[out.length-1];
-      if(OCR_ITEM_START.test(line) || OCR_ITEM_START.test(prev) || pendingBreak || OCR_TITLE.test(line) || OCR_TITLE.test(prev)){
+      if(OCR_ITEM_START.test(line) || pendingBreak || OCR_TITLE.test(line) || OCR_TITLE.test(prev) || prevShortItem(prev)){
         out.push('\n'); out.push(line);
       } else {
         out[out.length-1]=ocrJoinMerged(prev, line);
@@ -2085,16 +2103,81 @@ document.addEventListener('touchmove', function(e){ if(e.touches.length > 1){ e.
   function getOcrWorker(){
     if(ocrWorker) return Promise.resolve(ocrWorker);
     if(ocrWorkerLoading) return ocrWorkerLoading;
-    ocrWorkerLoading=Tesseract.createWorker('chi_sim+eng',1,{ workerBlobURL:true, logger:function(m){ if(m && typeof m.progress==='number' && ocrProgressCb){ ocrProgressCb(Math.round(m.progress*100)); } } })
+    ocrWorkerLoading=Tesseract.createWorker('chi_sim+eng',1,{ workerBlobURL:true, logger:function(m){
+      if(!m) return;
+      // 进度条只反映「正在识别文字」阶段的真实进度；引擎加载/初始化阶段的快速 0-100 不再误导（这就是之前进度条闪两遍的根因）
+      if(m.status==='recognizing text' && typeof m.progress==='number' && ocrProgressCb){ ocrProgressCb(Math.round(m.progress*100)); }
+      else if(m.status!=='recognizing text' && ocrPhaseCb){ ocrPhaseCb(); }
+    } })
+      // 单栏密集 JD 文本用 psm=6(统一文本块) 比默认 psm=3(自动版面分析) 又快又准——省掉反复猜布局的迭代
+      .then(function(w){ return w.setParameters({ tessedit_pageseg_mode: 6 }).then(function(){ return w; }).catch(function(){ return w; }); })
       .then(function(w){ ocrWorker=w; return w; });
     return ocrWorkerLoading;
   }
-  function runOCR(file, onProgress, onDone, onError){
+  // 预处理：智能缩放(大图缩小提速 / 小图放大提精度) + 灰度 + 大津(Otsu)+ISODATA 二值化(黑字白底)
+  // 文献一致表明：单栏密集文本经灰度+二值化可显著提升 Tesseract 中文识别率；二值图 PNG 无损且体积小。
+  // 暗底截图(如深色模式)自动反转为"文字暗于底"；阈值退化(某类占比<0.5% 几乎纯色)时回退纯灰度，绝不损坏原图。
+  function preprocessForOcr(file, cb){
+    try{
+      var img=new Image(), url=URL.createObjectURL(file);
+      img.onload=function(){
+        try{
+          var w=img.naturalWidth, h=img.naturalHeight;
+          var LONG=Math.max(w,h);
+          var scale=1, MAXS=2200, MINS=1000, UPTO=1500;
+          if(LONG>MAXS){ scale=MAXS/LONG; }                   // 大图缩小：提速
+          else if(LONG<MINS){ scale=Math.min(2, UPTO/LONG); }  // 小图放大：提精度(上限2x防过大)
+          var tw=Math.max(1,Math.round(w*scale)), th=Math.max(1,Math.round(h*scale));
+          var cv=document.createElement('canvas'); cv.width=tw; cv.height=th;
+          var ctx=cv.getContext('2d');
+          ctx.fillStyle='#fff'; ctx.fillRect(0,0,tw,th); // 白底，避免透明区域被当黑
+          ctx.drawImage(img,0,0,tw,th);
+          var data=ctx.getImageData(0,0,tw,th), px=data.data, n=px.length/4;
+          // 1) 灰度(亮度)
+          var gray=new Uint8ClampedArray(n);
+          for(var i=0;i<n;i++){ gray[i]=(px[i*4]*0.299+px[i*4+1]*0.587+px[i*4+2]*0.114)|0; }
+          // 2) 暗底反转：统一成"文字比底暗"，简化后续阈值
+          var mean=0; for(var i=0;i<n;i++) mean+=gray[i]; mean/=n;
+          if(mean<128){ for(var i=0;i<n;i++) gray[i]=255-gray[i]; }
+          // 3) Otsu 初值 + ISODATA 迭代收敛到两类均值中点(谷底)，消除 Otsu 落在峰边界的歧义
+          var hist=new Array(256); for(var k=0;k<256;k++) hist[k]=0;
+          for(var i=0;i<n;i++){ hist[gray[i]]++; }
+          var total=n, sum=0; for(var k=0;k<256;k++) sum+=k*hist[k];
+          var sumB=0, wB=0, mx=0, thr=127;
+          for(var k=0;k<256;k++){
+            wB+=hist[k]; if(wB===0) continue;
+            var wF=total-wB; if(wF===0) break;
+            sumB+=k*hist[k];
+            var mB=sumB/wB, mF=(sum-sumB)/wF;
+            var between=wB*wF*(mB-mF)*(mB-mF);
+            if(between>mx){ mx=between; thr=k; }
+          }
+          for(var it=0; it<20; it++){
+            var s1=0,c1=0,s2=0,c2=0;
+            for(var i=0;i<n;i++){ if(gray[i]<=thr){ s1+=gray[i]; c1++; } else { s2+=gray[i]; c2++; } }
+            if(c1===0||c2===0) break;
+            var nt=(s1/c1 + s2/c2)/2;
+            if(Math.abs(nt-thr)<0.5) break;
+            thr=nt;
+          }
+          // 4) 二值化；阈值退化(某类占比<0.5% 几乎纯色)时回退纯灰度
+          var wLo=0,wHi=0; for(var i=0;i<n;i++){ if(gray[i]<=thr) wLo++; else wHi++; }
+          var useBin=(thr>12 && thr<248 && wLo>0.005*n && wHi>0.005*n);
+          for(var i=0;i<n;i++){ var v=useBin?(gray[i]<thr?0:255):gray[i]; px[i*4]=px[i*4+1]=px[i*4+2]=v; px[i*4+3]=255; }
+          ctx.putImageData(data,0,0);
+          cv.toBlob(function(b){ URL.revokeObjectURL(url); cb(b||file); }, 'image/png');
+        }catch(e){ try{ URL.revokeObjectURL(url); }catch(_){} cb(file); }
+      };
+      img.onerror=function(){ try{ URL.revokeObjectURL(url); }catch(_){} cb(file); };
+      img.src=url;
+    }catch(e){ cb(file); }
+  }
+  function runOCR(file, onProgress, onDone, onError, onPhase){
     loadTesseract(function(){
       if(!window.Tesseract){ onError('OCR 组件不可用，请检查网络后刷新页面，或手动粘贴 JD 文字。'); return; }
       try{
-        ocrProgressCb=onProgress;
-        getOcrWorker().then(function(w){ return w.recognize(file); })
+        ocrProgressCb=onProgress; ocrPhaseCb=onPhase||null;
+        getOcrWorker().then(function(w){ return new Promise(function(res){ preprocessForOcr(file, function(b){ res(w.recognize(b)); }); }); })
           .then(function(res){ onDone(reflowOcrLines(fixOcrSpacing((res && res.data && res.data.text) || ''))); })
           .catch(function(e){ onError('OCR 识别失败：'+((e&&e.message)?e.message:e)); });
       }catch(e){ onError('OCR 启动失败：'+((e&&e.message)?e.message:e)); }
@@ -2112,7 +2195,7 @@ document.addEventListener('touchmove', function(e){ if(e.touches.length > 1){ e.
       var f=file.files && file.files[0];
       if(!f){ return; }
       btn.disabled=true;
-      setMsg('识别中 0%…', 'busy');
+      setMsg('准备识别引擎…', 'busy');
       runOCR(f,
         function(pct){ setMsg('识别中 '+pct+'%…', 'busy'); },
         function(text){
@@ -2132,7 +2215,8 @@ document.addEventListener('touchmove', function(e){ if(e.touches.length > 1){ e.
             setMsg('识别完成，已填入 JD 原文，请核对/修改文字后点「识别填充」并「保存」。', 'ok');
           }
         },
-        function(errTxt){ btn.disabled=false; setMsg(errTxt, 'err'); }
+        function(errTxt){ btn.disabled=false; setMsg(errTxt, 'err'); },
+        function(){ setMsg('首次使用正在加载识别引擎（约几秒~十几秒），之后识别会明显变快…', 'busy'); }
       );
     });
   }
@@ -2497,8 +2581,8 @@ document.addEventListener('touchmove', function(e){ if(e.touches.length > 1){ e.
   var searchClear=document.getElementById('searchClear');
   function syncSearchClear(){ if(searchClear){ searchClear.classList.toggle('show', !!searchInput.value); } }
   if(searchInput){
-    searchInput.addEventListener('input',function(){ searchTerm=searchInput.value.trim(); syncSearchClear(); render(); });
-    if(searchClear){ searchClear.addEventListener('click',function(){ searchInput.value=''; searchTerm=''; syncSearchClear(); render(); }); }
+    searchInput.addEventListener('input',function(){ searchTerm=searchInput.value.trim(); syncSearchClear(); buildFilters(); render(); });
+    if(searchClear){ searchClear.addEventListener('click',function(){ searchInput.value=''; searchTerm=''; syncSearchClear(); buildFilters(); render(); }); }
   }
 
   // 切回页面（如手机端推完、回到电脑端标签页）自动拉一次云端，及时拿到其他设备的日期/状态更新；只拉不推，安全
