@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- 求职管家工作台 v262：电脑端弹窗垂直居中——新增 @media(min-width:481px) 专属块(mask 居中+modal margin:auto+max-height 防溢出)，手机端 <480px 规则原样不动。上一版 v261：求职日历新增「打招呼」维度（纠正此前误标的 v73；真实版本序列接续 v260）——① 数据模型新增打招呼日期字段(表单/编辑/CSV导出/云端同步签名全覆盖)；② 日历格按天显示"招 N"徽标+图例+当日明细(打招呼/投递/面试三栏)；③ 卡片新增一键「打招呼」按钮(标记今天+待打招呼→待投)与卡片底栏"招 日期"提示。-->
+<!-- 求职管家工作台 v263：移除岗位卡片里的「打招呼」一键按钮(含其事件绑定/markGreeting函数/专属CSS)；卡片底栏「招 日期」文字提示保留，日历"打招呼日期"字段与求职日历"招 N"展示不受影响。-->
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
@@ -249,8 +249,6 @@ document.addEventListener('touchmove', function(e){ if(e.touches.length > 1){ e.
   .card-actions button.edit-btn:active{background:#f3f4f6;}
   .card-actions button.del-btn{background:transparent;color:#e5484d;border-color:#ffd0d0;}
   .card-actions button.del-btn:active{background:#fff0f0;}
-  .card-actions button.greet-btn{background:#eafaf0;color:#16824f;border-color:#bde9cf;font-weight:600;}
-  .card-actions button.greet-btn:active{background:#d7f2e2;border-color:#a3ddc0;}
   /* 窄屏：四按钮强制一行紧凑排布，压缩其他按钮给状态选择器让位，保证状态文案不截断 */
   @media (max-width:480px){
     .card-actions{gap:6px;}
@@ -1540,9 +1538,6 @@ document.addEventListener('touchmove', function(e){ if(e.touches.length > 1){ e.
     Array.prototype.forEach.call(list.querySelectorAll('.pitch-btn'),function(b){
       b.addEventListener('click',function(){ openPitchEditor(b.getAttribute('data-id')); });
     });
-    Array.prototype.forEach.call(list.querySelectorAll('.greet-btn'),function(b){
-      b.addEventListener('click',function(){ markGreeting(b.getAttribute('data-id')); });
-    });
   }
 
   // ===== 数据看板（回顾 / 看板）=====
@@ -1776,21 +1771,6 @@ document.addEventListener('touchmove', function(e){ if(e.touches.length > 1){ e.
     mask.addEventListener('click',function(e){ if(e.target===mask){ /* 点遮罩不关，等按钮 */ } });
   }
 
-  // 一键记录「今天打了招呼」：卡片「打招呼」按钮触发；若已记过日期则提示不改写
-  function markGreeting(id){
-    var r=findById(id); if(!r) return;
-    var today=todayStr();
-    if(r['打招呼日期']){
-      showCopyToast('已于 '+r['打招呼日期']+' 记录打招呼');
-      return;
-    }
-    r['打招呼日期']=today;
-    if((r['投递状态']||'')==='待打招呼'){ r['投递状态']='待投'; }
-    r['更新时间']=nowStr();
-    upsert(r); loadData();
-    showCopyToast('已标记 '+today+' 打了招呼');
-  }
-
   function renderCard(r){
     var id = r.id;
     var st=r['投递状态']||'';
@@ -1826,7 +1806,6 @@ document.addEventListener('touchmove', function(e){ if(e.touches.length > 1){ e.
       + jdSec
       +'<div class="card-actions">'
         +'<div class="status-dd" data-id="'+esc(id)+'"></div>'
-        +'<button class="greet-btn" data-id="'+esc(id)+'">打招呼</button>'
         +'<button class="pitch-btn" data-id="'+esc(id)+'">写话术</button>'
         +'<button class="edit-btn" data-id="'+esc(id)+'">编辑</button>'
         +'<button class="del-btn" data-id="'+esc(id)+'">删除</button>'
