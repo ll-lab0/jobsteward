@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- 求职管家工作台 v273：日历徽标配色补齐——「招呼」底色由 #eef0ff 加深为 #e2e7ff(原色过浅不可见)；补上 v271 缺失的「录 N」普通态样式(#ecefF2 底/#566573 字，当时批量编辑未落盘)与图例「录入记录」色块(.cal-dot-entry)。前置 v272 日期框修复。-->
+<!-- 求职管家工作台 v274：三项低优先级体验修复——① parseJD 岗位名提取摆脱对换行的依赖：招聘行本身含职位名时同行即抓(如折行合并后「XX公司 招聘 FDE前置交付工程师」同处一行)，手敲换行 JD 仍走「下一行」兜底；② OCR 标题白名单扩充(职位详情/岗位详情/你要做的事/工作目标/岗位信息/我们提供)，避免这些标题行被误并；③ 新增 isOcrNoise 杂讯行过滤，仅丢弃孤立的页眉/页脚水印(如「18sep.2026」「18:09:26」「第3页」)，不删正文。注：旧 summary 提及的 L1609「过期文案」已无残留(v263 删按钮时一并清掉)，免改。前置 v273 徽标配色。-->
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
@@ -1970,19 +1970,29 @@ document.addEventListener('touchmove', function(e){ if(e.touches.length > 1){ e.
     ];
     r.position=kv(['岗位名','职位名','职位','岗位','职务','招聘岗位','招聘职位','岗位名称','职位名称'],30);
     if(!r.position){
-      // 招聘行后的首行常是职位名（如「FDE 前置交付工程师」），优先尝试：在头部区找招聘行，取其后的首个「像职位」的行
+      // 岗位名提取（不依赖换行）：优先「显式职位标签」已在上方 kv() 命中；
+      // 此处兜底——在头部区找招聘行：先试「同行提取」（招聘行本身已含职位名，如折行合并后
+      // 「XX公司 招聘 FDE前置交付工程师」同处一行，手敲 JD 带换行时下一行才是职位名），
+      // 两种格式都能命中，彻底摆脱对「招聘行后另起一行」的依赖。
       var lines2=text.split(/\r?\n/).map(function(s){return s.trim();}).filter(Boolean);
       var he2=lines2.findIndex(function(ln){return /职位描述|岗位职责|任职要求|responsibilit|job description|关于我们|公司简介|^#{1,3}\s/.test(ln.toLowerCase());});
       var zone2=(he2===-1)?lines2:lines2.slice(0,he2);
       var ri=zone2.findIndex(function(ln){return /招聘|诚聘|招募/.test(ln) && !/^#/.test(ln);});
       if(ri>-1){
-        for(var pi=ri+1; pi<zone2.length; pi++){
-          var raw=zone2[pi];
-          if(/^#/.test(raw)) continue;            // 标题行交给 # 正则处理
-          var cand=cleanPos(raw);
-          if(!cand || cand.length<2 || cand.length>30) continue;
-          if(/[KkWw万]|[-~—]|薪|元|月|年|经验|学历|本科|大专|城市|地点|地区|工作地|职责|要求|福利|简介|背景|亮点|详情|描述/.test(cand)) continue; // 非薪资/地点/分区标题
-          r.position=cand; break;
+        // 同行提取：招聘行自身可能已含职位名（折行合并后同处一行）
+        var sameRe=/招聘\s*([一-龥A-Za-z0-9/·]{2,18}?(?:经理|工程师|专员|总监|主管|专家|顾问|BP|PM|代表|助理|负责人|策划|设计|分析师|岗|职位|岗位))/;
+        var sm=zone2[ri].match(sameRe);
+        if(sm){ var sc=cleanPos(sm[1]); if(sc.length>=2 && sc.length<=30 && !/描述|职责|要求|说明|关于|福利|简介|背景|亮点/.test(sc)){ r.position=sc; } }
+        // 未命中同行（手敲 JD 换行场景）再取其后的首个「像职位」的行
+        if(!r.position){
+          for(var pi=ri+1; pi<zone2.length; pi++){
+            var raw=zone2[pi];
+            if(/^#/.test(raw)) continue;            // 标题行交给 # 正则处理
+            var cand=cleanPos(raw);
+            if(!cand || cand.length<2 || cand.length>30) continue;
+            if(/[KkWw万]|[-~—]|薪|元|月|年|经验|学历|本科|大专|城市|地点|地区|工作地|职责|要求|福利|简介|背景|亮点|详情|描述/.test(cand)) continue; // 非薪资/地点/分区标题
+            r.position=cand; break;
+          }
         }
       }
     }
@@ -2087,9 +2097,25 @@ document.addEventListener('touchmove', function(e){ if(e.touches.length > 1){ e.
   //   其余一律视为段中折行→合并(中英文/英文词间补空格，纯中文段中不补)。
   //   已剔除旧版"上一行句号即分段"规则——句号在段中极常见，会误把同段折行切断。
   var OCR_ITEM_START = /^([0-9]+[.、)）]|[(（][0-9]+[)）]|[①-⑳]|[\-·•*—◆▶▍▸■□●○]|【|〔|「)/;
-  var OCR_TITLE = /^(岗位职责|任职要求|任职资格|工作内容|工作要求|岗位要求|任职条件|公司福利|薪资福利|福利待遇|加分项|关于我们|公司介绍|岗位亮点|岗位描述|薪资待遇|职位描述|职位要求|职责描述|我们期待你|你将收获|加入我们|我们需要|公司优势|团队介绍|岗位诱惑|联系方式|工作地点|岗位概览|About\s*Us|Requirements?|Responsibilities|Qualifications|Job\s*Description|Preferred|Bonus|Benefits|Salary|Compensation|Who\s*You\s*Are|What\s*You.?ll\s*Do|We\s*Offer)\s*[：:，。.!?]?$/i;
+  var OCR_TITLE = /^(岗位职责|任职要求|任职资格|工作内容|工作要求|岗位要求|任职条件|公司福利|薪资福利|福利待遇|加分项|关于我们|公司介绍|岗位亮点|岗位描述|薪资待遇|职位描述|职位要求|职责描述|我们期待你|你将收获|加入我们|我们需要|公司优势|团队介绍|岗位诱惑|联系方式|工作地点|岗位概览|职位详情|岗位详情|你要做的事|工作目标|岗位信息|我们提供|About\s*Us|Requirements?|Responsibilities|Qualifications|Job\s*Description|Preferred|Bonus|Benefits|Salary|Compensation|Who\s*You\s*Are|What\s*You.?ll\s*Do|We\s*Offer)\s*[：:，。.!?]?$/i;
   var OCR_SENT_END = /[。！？；]$/;
   var OCR_WRAP_MID = /[，、：,]$/; // 行尾是逗号/顿号/冒号→明显没说完，是被折断的
+  // OCR 杂讯行过滤：截图常带入页眉/页脚水印（如「18sep.2026」「18:09:26」「第 3 页」）。
+  // 仅当整行且孤立（前为空行或处于首行）才丢弃，绝不删正文中的日期/时间，符合逐字抄录红线。
+  function isOcrNoise(line){
+    if(!line) return false;
+    var s=line.trim();
+    if(!s || s.length>24) return false;
+    if(/^\d{1,2}[a-z]{3,5}\.?\s*\d{2,4}$/i.test(s)) return true;          // 18sep.2026
+    if(/^\d{4}[-/.]\d{1,2}[-/.]\d{1,2}$/.test(s)) return true;            // 2026-09-18 / 2026.09.18
+    if(/^\d{4}年\d{1,2}月\d{1,2}日$/.test(s)) return true;                // 2026年9月18日
+    if(/^\d{1,2}:\d{2}(:\d{2})?$/.test(s)) return true;                  // 18:09:26 / 18:09
+    if(/^[Pp]\.?\s*\d+$/.test(s)) return true;                           // P12 / p.12
+    if(/^第\s*\d+\s*页$/.test(s)) return true;                           // 第 3 页
+    if(/^-\s*\d+\s*-$/.test(s)) return true;                            // -3-
+    if(/截图|水印|识别时间|scan|screenshot/i.test(s) && s.length<20) return true; // 截图水印残留
+    return false;
+  }
   function ocrJoinMerged(prev, cur){
     var end=prev.slice(-1), start=cur.slice(0,1);
     var cjk=/[一-龥]/, az=/[A-Za-z0-9]/, enPunct=/[.,;:!?]/;
@@ -2110,6 +2136,8 @@ document.addEventListener('touchmove', function(e){ if(e.touches.length > 1){ e.
     for(var i=0;i<raw.length;i++){
       var line=raw[i].trim();
       if(!line){ pendingBreak=true; continue; }
+      // 孤立杂讯行（首行或空行之后）直接丢弃，不进正文、不计分段信号
+      if(isOcrNoise(line) && (out.length===0 || pendingBreak)){ continue; }
       if(out.length===0){ out.push(line); pendingBreak=false; continue; }
       var prev=out[out.length-1];
       if(OCR_ITEM_START.test(line) || pendingBreak || OCR_TITLE.test(line) || OCR_TITLE.test(prev) || prevShortItem(prev)){
