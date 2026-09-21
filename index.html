@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- 求职管家工作台 v272：修复日期框双图标与点击不弹日历——隐藏 Chrome 原生 ::-webkit-calendar-picker-indicator(此前与自绘 SVG 叠加成两个图标)，并给打招呼/投递/面试三个日期框加 click→showPicker() 兜底(Chrome 稳定弹日历，Safari 不支持则静默忽略维持键入)。前置 v271 录入维度。-->
+<!-- 求职管家工作台 v273：日历徽标配色补齐——「招呼」底色由 #eef0ff 加深为 #e2e7ff(原色过浅不可见)；补上 v271 缺失的「录 N」普通态样式(#ecefF2 底/#566573 字，当时批量编辑未落盘)与图例「录入记录」色块(.cal-dot-entry)。前置 v272 日期框修复。-->
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
@@ -405,13 +405,15 @@ document.addEventListener('touchmove', function(e){ if(e.touches.length > 1){ e.
   .cal-badge{font-size:10px;line-height:1.2;margin-top:2px;border-radius:5px;padding:2px 4px;display:block;white-space:normal;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;max-width:100%;}
   .cal-badge.cal-deliver{background:#e7f7ee;color:#16824f;font-weight:600;}
   .cal-badge.cal-interview{background:#fff1e0;color:#cf6f0a;font-weight:600;}
-  .cal-badge.cal-greet{background:#eef0ff;color:#4c5bd4;font-weight:600;}
+  .cal-badge.cal-greet{background:#e2e7ff;color:#4c5bd4;font-weight:600;}
+  .cal-badge.cal-entry{background:#ecefF2;color:#566573;font-weight:600;}
   .cal-legend{display:flex;gap:16px;align-items:center;margin:14px 4px 2px;font-size:12px;color:#6b7280;}
   .cal-leg-item{display:flex;align-items:center;gap:6px;}
   .cal-dot{width:10px;height:10px;border-radius:3px;display:inline-block;}
   .cal-dot-deliver{background:#16824f;}
   .cal-dot-interview{background:#cf6f0a;}
   .cal-dot-greet{background:#4c5bd4;}
+  .cal-dot-entry{background:#566573;}
   .cal-note{font-size:12px;color:#9aa3af;margin:10px 2px;}
   .cal-cell.cal-active{background:linear-gradient(180deg,#2f6bff,#4c84ff)!important;border-color:#2f6bff!important;color:#fff!important;box-shadow:0 4px 14px rgba(47,107,255,.28)!important;z-index:2;}
   .cal-cell.cal-active .cal-date{color:#fff!important;}
