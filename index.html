@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- 求职管家工作台 v271：求职日历新增「录入」维度——日历格子新增灰色「录 N」徽标(按记录「录入时间」天级别标记，新建岗位当天自动显示，无需手动填)；同步新增明细面板「录入（N 条）」分区、图例「录入记录」与说明文案。旧记录已由 normalizeRows 用更新时间回填录入时间，全量可见。前置 v267 文案/v268 胶囊计数/v269 OCR体验/v270 精度。-->
+<!-- 求职管家工作台 v272：修复日期框双图标与点击不弹日历——隐藏 Chrome 原生 ::-webkit-calendar-picker-indicator(此前与自绘 SVG 叠加成两个图标)，并给打招呼/投递/面试三个日期框加 click→showPicker() 兜底(Chrome 稳定弹日历，Safari 不支持则静默忽略维持键入)。前置 v271 录入维度。-->
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
@@ -168,7 +168,9 @@ document.addEventListener('touchmove', function(e){ if(e.touches.length > 1){ e.
   .form textarea{resize:vertical;min-height:48px;line-height:1.5;}
   #jdInput{min-height:130px;padding-top:6px;padding-bottom:20px;}
   textarea[name="pitch"]{min-height:120px;}
-  .form input[type="date"]{-webkit-appearance:none;appearance:none;min-width:100%;min-height:44px;background:#fafbfc url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='4' width='18' height='18' rx='2' ry='2'/%3E%3Cline x1='16' y1='2' x2='16' y2='6'/%3E%3Cline x1='8' y1='2' x2='8' y2='6'/%3E%3Cline x1='3' y1='10' x2='21' y2='10'/%3E%3C/svg%3E") no-repeat right 10px center;padding-right:34px;}
+  .form input[type="date"]{-webkit-appearance:none;appearance:none;min-width:100%;min-height:44px;background:#fafbfc url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='4' width='18' height='18' rx='2' ry='2'/%3E%3Cline x1='16' y1='2' x2='16' y2='6'/%3E%3Cline x1='8' y1='2' x2='8' y2='6'/%3E%3Cline x1='3' y1='10' x2='21' y2='10'/%3E%3C/svg%3E") no-repeat right 10px center;padding-right:34px;cursor:pointer;}
+  /* 隐藏 Chrome 原生日历图标，避免与自绘图标叠加成两个；点击改由 showPicker() 调起 */
+  .form input[type="date"]::-webkit-calendar-picker-indicator{display:none;}
   .form-actions{display:flex;gap:10px;margin-top:6px;}
   .form-actions button{flex:1;min-height:46px;border-radius:10px;font-size:15px;font-weight:600;border:none;}
   .form-actions .save{background:var(--brand);color:#fff;}
@@ -1851,6 +1853,12 @@ document.addEventListener('touchmove', function(e){ if(e.touches.length > 1){ e.
   var formCloseBtn=document.getElementById('formCloseBtn');
   if(formCloseBtn){ formCloseBtn.addEventListener('click',function(e){ e.preventDefault(); e.stopPropagation(); closeAllStatusDd(); jobFormModal.classList.remove('show'); jobFormModal.style.zIndex=''; editingId=null; }); }
   jobFormModal.addEventListener('click',function(e){ if(e.target===jobFormModal){ closeAllStatusDd(); jobFormModal.classList.remove('show'); jobFormModal.style.zIndex=''; editingId=null; } });
+
+  // 日期框：点击任意位置调起 Chrome 原生日历选择器（Safari 不支持则静默忽略，维持键入方式）
+  ['greetDate','deliverDate','interviewDate'].forEach(function(n){
+    var el=document.querySelector('input[name="'+n+'"]');
+    if(el){ el.addEventListener('click',function(){ try{ if(el.showPicker) el.showPicker(); }catch(e){} }); }
+  });
 
   var aiHint=document.getElementById('aiHint');
   try{ if(localStorage.getItem('aiHintClosed')==='1' && aiHint){ aiHint.style.display='none'; } }catch(e){}
