@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- 求职管家工作台 v270：OCR 识别精度优化(一+二层)——① 预处理：智能缩放(大图缩到长边2200提速/小图放大提精度) + 灰度 + Otsu+ISODATA 二值化(黑字白底，暗底自动反转、阈值退化回退灰度)，输出 PNG 无损；② Tesseract 参数 psm=6(统一文本块) 替代默认 psm=3(自动版面分析)，单栏密集 JD 文本又快又准。仅提升识别质量，不改任何识别出的文字(符合逐字抄录红线)。前置 v267 文案/v268 胶囊计数/v269 折行合并与进度条。-->
+<!-- 求职管家工作台 v271：求职日历新增「录入」维度——日历格子新增灰色「录 N」徽标(按记录「录入时间」天级别标记，新建岗位当天自动显示，无需手动填)；同步新增明细面板「录入（N 条）」分区、图例「录入记录」与说明文案。旧记录已由 normalizeRows 用更新时间回填录入时间，全量可见。前置 v267 文案/v268 胶囊计数/v269 OCR体验/v270 精度。-->
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
@@ -417,6 +417,7 @@ document.addEventListener('touchmove', function(e){ if(e.touches.length > 1){ e.
   .cal-cell.cal-active .cal-badge.cal-deliver{background:rgba(255,255,255,.22)!important;color:#fff!important;}
   .cal-cell.cal-active .cal-badge.cal-interview{background:rgba(255,255,255,.22)!important;color:#fff!important;}
   .cal-cell.cal-active .cal-badge.cal-greet{background:rgba(255,255,255,.22)!important;color:#fff!important;}
+  .cal-cell.cal-active .cal-badge.cal-entry{background:rgba(255,255,255,.22)!important;color:#fff!important;}
   .cal-detail-inline{grid-column:1 / -1;background:#f8fbff;border:1px solid #eef5ff;border-radius:10px;padding:12px 14px;margin:2px 8px 8px;box-shadow:0 1px 2px rgba(47,107,255,.03);animation:calFade .18s ease-out;}
   @keyframes calFade{from{opacity:0;transform:translateY(-6px);}to{opacity:1;transform:translateY(0);}}
   .cal-detail-inline-title{font-size:14px;font-weight:700;color:#1f2a44;margin-bottom:10px;display:flex;align-items:center;gap:8px;}
@@ -1579,11 +1580,13 @@ document.addEventListener('touchmove', function(e){ if(e.touches.length > 1){ e.
     var map={};
     rows.forEach(function(r){
       var gd=(r['打招呼日期']||'').trim();
-      if(gd){ if(!map[gd]) map[gd]={deliver:[],interview:[],greet:[]}; map[gd].greet.push(r); }
+      if(gd){ if(!map[gd]) map[gd]={deliver:[],interview:[],greet:[],entry:[]}; map[gd].greet.push(r); }
       var d=(r['投递日期']||'').trim();
-      if(d){ if(!map[d]) map[d]={deliver:[],interview:[],greet:[]}; map[d].deliver.push(r); }
+      if(d){ if(!map[d]) map[d]={deliver:[],interview:[],greet:[],entry:[]}; map[d].deliver.push(r); }
       var iv=(r['面试日期']||'').trim();
-      if(iv){ if(!map[iv]) map[iv]={deliver:[],interview:[],greet:[]}; map[iv].interview.push(r); }
+      if(iv){ if(!map[iv]) map[iv]={deliver:[],interview:[],greet:[],entry:[]}; map[iv].interview.push(r); }
+      var ed=(r['录入时间']||'').slice(0,10);
+      if(ed){ if(!map[ed]) map[ed]={deliver:[],interview:[],greet:[],entry:[]}; map[ed].entry.push(r); }
     });
     var y=calState.year, m=calState.month;
     var first=new Date(y,m,1);
@@ -1602,19 +1605,21 @@ document.addEventListener('touchmove', function(e){ if(e.touches.length > 1){ e.
       var dn=has?has.deliver.length:0;
       var inN=has?has.interview.length:0;
       var gn=has?has.greet.length:0;
-      var cls='cal-cell'+((dn||inN||gn)?' cal-has':'');
+      var enN=has?has.entry.length:0;
+      var cls='cal-cell'+((dn||inN||gn||enN)?' cal-has':'');
       var t=new Date(); var isToday=(t.getFullYear()===y&&t.getMonth()===m&&t.getDate()===c.d);
       if(isToday) cls+=' cal-today-cell';
       html+='<div class="'+cls+'" data-key="'+c.key+'">';
       html+='<div class="cal-date">'+(isToday?'<span class="cal-today-label">今</span>':'')+'<span>'+c.d+'</span></div>';
+      if(enN){ html+='<div class="cal-badge cal-entry" title="录入 '+enN+' 条">录 '+enN+'</div>'; }
       if(gn){ html+='<div class="cal-badge cal-greet" title="打招呼 '+gn+' 家">招呼 '+gn+'</div>'; }
       if(dn){ html+='<div class="cal-badge cal-deliver" title="投递 '+dn+' 份">投 '+dn+'</div>'; }
       if(inN){ html+='<div class="cal-badge cal-interview" title="面试 '+inN+' 家">面 '+inN+'</div>'; }
       html+='</div>';
     });
     html+='</div>';
-    html+='<div class="cal-legend"><span class="cal-leg-item"><i class="cal-dot cal-dot-greet"></i>打招呼</span><span class="cal-leg-item"><i class="cal-dot cal-dot-deliver"></i>投递记录</span><span class="cal-leg-item"><i class="cal-dot cal-dot-interview"></i>面试安排</span></div>';
-    html+='<div class="cal-note">仅显示填了「打招呼 / 投递 / 面试」日期的日期；<br>在卡片点「打招呼」即可一键记今天，或去「编辑」补填具体日期。</div>';
+    html+='<div class="cal-legend"><span class="cal-leg-item"><i class="cal-dot cal-dot-entry"></i>录入记录</span><span class="cal-leg-item"><i class="cal-dot cal-dot-greet"></i>打招呼</span><span class="cal-leg-item"><i class="cal-dot cal-dot-deliver"></i>投递记录</span><span class="cal-leg-item"><i class="cal-dot cal-dot-interview"></i>面试安排</span></div>';
+    html+='<div class="cal-note">显示有记录的日期；<br>「录」由系统自动标记（新建岗位当天），「招呼 / 投 / 面」需填对应日期。</div>';
     cv.innerHTML=html;
     var prev=document.getElementById('calPrev'); if(prev) prev.onclick=function(){ calState.month--; if(calState.month<0){calState.month=11;calState.year--;} renderCalendar(); };
     var next=document.getElementById('calNext'); if(next) next.onclick=function(){ calState.month++; if(calState.month>11){calState.month=0;calState.year++;} renderCalendar(); };
@@ -1634,11 +1639,17 @@ document.addEventListener('touchmove', function(e){ if(e.touches.length > 1){ e.
     closeCalDetail();
     cell.classList.add('cal-active');
     var rows=activeRows();
+    var entry=rows.filter(function(r){return (r['录入时间']||'').slice(0,10)===key;});
     var greet=rows.filter(function(r){return (r['打招呼日期']||'').trim()===key;});
     var deliver=rows.filter(function(r){return (r['投递日期']||'').trim()===key;});
     var interview=rows.filter(function(r){return (r['面试日期']||'').trim()===key;});
     var html='<div class="cal-detail-inline" data-detail-key="'+key+'">';
     html+='<div class="cal-detail-inline-title">'+key+' 求职记录</div>';
+    if(entry.length){
+      html+='<div class="cal-detail-inline-sec"><h4>录入（'+entry.length+' 条）</h4>';
+      entry.forEach(function(r){ html+='<div class="cal-detail-inline-row"><b>'+(r['公司']||'未填公司')+'</b><span>'+(r['职位']||'')+'</span><span class="cal-detail-inline-st">'+(r['投递状态']||'')+'</span></div>'; });
+      html+='</div>';
+    }
     if(greet.length){
       html+='<div class="cal-detail-inline-sec"><h4>打招呼（'+greet.length+' 家）</h4>';
       greet.forEach(function(r){ html+='<div class="cal-detail-inline-row" data-edit-id="'+esc(r.id)+'" data-edit-field="greetDate"><b>'+(r['公司']||'未填公司')+'</b><span>'+(r['职位']||'')+'</span><span class="cal-detail-inline-st">'+(r['投递状态']||'')+'</span></div>'; });
@@ -1654,7 +1665,7 @@ document.addEventListener('touchmove', function(e){ if(e.touches.length > 1){ e.
       interview.forEach(function(r){ html+='<div class="cal-detail-inline-row" data-edit-id="'+esc(r.id)+'" data-edit-field="interviewDate"><b>'+(r['公司']||'未填公司')+'</b><span>'+(r['职位']||'')+'</span><span class="cal-detail-inline-st">'+(r['投递状态']||'')+'</span></div>'; });
       html+='</div>';
     }
-    if(!greet.length&&!deliver.length&&!interview.length){ html+='<div class="cal-detail-inline-empty">这一天没有打招呼 / 投递 / 面试记录</div>'; }
+    if(!entry.length&&!greet.length&&!deliver.length&&!interview.length){ html+='<div class="cal-detail-inline-empty">这一天没有录入 / 打招呼 / 投递 / 面试记录</div>'; }
     html+='</div>';
     var wrap=document.createElement('div'); wrap.innerHTML=html;
     var detail=wrap.firstChild;
