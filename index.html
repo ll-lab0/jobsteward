@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- 求职管家工作台 v275：日历明细标题「求职记录」→「求职足迹」，更温暖、与日历时间轴气质契合；同时保留用户偏爱的「手帐」概念作为后续可结合方向(见日志)。前置 v274 三项体验修复。-->
+<!-- 求职管家工作台 v276：修复「写话术(打招呼话术)」保存后日历不显示招呼——话术弹窗保存时若该记录尚无「打招呼日期」则自动记为当天(YYYY-MM-DD，与表单日期格式一致、日历日级匹配)，已填过则不覆盖；卡片底栏「招呼 日期」同步可见。前置 v275 求职足迹。-->
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
@@ -1787,6 +1787,8 @@ document.addEventListener('touchmove', function(e){ if(e.touches.length > 1){ e.
       var val=ta.value;
       r['打招呼话术']=val;
       if(val.trim() && (r['投递状态']||'')==='待打招呼'){ r['投递状态']='待投'; }
+      // 保存话术即视为「打了招呼」：若该记录尚无招呼日期，自动记为当天（存 YYYY-MM-DD，与表单日期格式一致、日历按日级匹配）；已填过则不覆盖，避免之后改话术误挪招呼日
+      if(!r['打招呼日期']){ r['打招呼日期']=nowStr().slice(0,10); }
       r['更新时间']=nowStr();
       upsert(r);
       document.body.removeChild(mask); loadData();
