@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- 求职管家工作台 v274：三项低优先级体验修复——① parseJD 岗位名提取摆脱对换行的依赖：招聘行本身含职位名时同行即抓(如折行合并后「XX公司 招聘 FDE前置交付工程师」同处一行)，手敲换行 JD 仍走「下一行」兜底；② OCR 标题白名单扩充(职位详情/岗位详情/你要做的事/工作目标/岗位信息/我们提供)，避免这些标题行被误并；③ 新增 isOcrNoise 杂讯行过滤，仅丢弃孤立的页眉/页脚水印(如「18sep.2026」「18:09:26」「第3页」)，不删正文。注：旧 summary 提及的 L1609「过期文案」已无残留(v263 删按钮时一并清掉)，免改。前置 v273 徽标配色。-->
+<!-- 求职管家工作台 v275：日历明细标题「求职记录」→「求职足迹」，更温暖、与日历时间轴气质契合；同时保留用户偏爱的「手帐」概念作为后续可结合方向(见日志)。前置 v274 三项体验修复。-->
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
@@ -1648,7 +1648,7 @@ document.addEventListener('touchmove', function(e){ if(e.touches.length > 1){ e.
     var deliver=rows.filter(function(r){return (r['投递日期']||'').trim()===key;});
     var interview=rows.filter(function(r){return (r['面试日期']||'').trim()===key;});
     var html='<div class="cal-detail-inline" data-detail-key="'+key+'">';
-    html+='<div class="cal-detail-inline-title">'+key+' 求职记录</div>';
+    html+='<div class="cal-detail-inline-title">'+key+' 求职足迹</div>';
     if(entry.length){
       html+='<div class="cal-detail-inline-sec"><h4>录入（'+entry.length+' 条）</h4>';
       entry.forEach(function(r){ html+='<div class="cal-detail-inline-row"><b>'+(r['公司']||'未填公司')+'</b><span>'+(r['职位']||'')+'</span><span class="cal-detail-inline-st">'+(r['投递状态']||'')+'</span></div>'; });
