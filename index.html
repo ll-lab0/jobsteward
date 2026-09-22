@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- 求职管家工作台 v276：修复「写话术(打招呼话术)」保存后日历不显示招呼——话术弹窗保存时若该记录尚无「打招呼日期」则自动记为当天(YYYY-MM-DD，与表单日期格式一致、日历日级匹配)，已填过则不覆盖；卡片底栏「招呼 日期」同步可见。前置 v275 求职足迹。-->
+<!-- 求职管家工作台 v277：导出 CSV 下载成功 toast 文案「已触发下载」→「下载成功」，更直白。前置 v276 写话术自动记招呼日期。-->
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
@@ -2475,7 +2475,7 @@ document.addEventListener('touchmove', function(e){ if(e.touches.length > 1){ e.
       var done=function(msg){ showCopyToast(msg); };
       try{
         if(navigator.clipboard && navigator.clipboard.writeText){
-          navigator.clipboard.writeText(content).then(function(){ done('已触发下载'); }).catch(function(){ fallbackCopy(content); done('已复制，可手动保存'); });
+          navigator.clipboard.writeText(content).then(function(){ done('下载成功'); }).catch(function(){ fallbackCopy(content); done('已复制，可手动保存'); });
         } else { fallbackCopy(content); done('已复制，可手动保存'); }
       }catch(_){ try{ fallbackCopy(content); }catch(e){} done('已复制，可手动保存'); }
       setTimeout(closeIt, 1500);
