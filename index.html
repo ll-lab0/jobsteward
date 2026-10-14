@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- 求职管家工作台 v277：导出 CSV 下载成功 toast 文案「已触发下载」→「下载成功」，更直白。前置 v276 写话术自动记招呼日期。-->
+<!-- 求职管家工作台 v278：改状态进入「已投递」区间（已投·待回复/面试中/已Offer/已拒）且未填投递日期时，自动记为当天；与 v276 招呼日期逻辑一致。前置 v277 导出 CSV toast 文案。-->
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
@@ -705,6 +705,9 @@ document.addEventListener('touchmove', function(e){ if(e.touches.length > 1){ e.
   var STATUS_LIST=['待打招呼','待投','已投·待回复','不合适','面试中','已拒','已Offer'];
   var BADGE_CLASS={'待打招呼':'b-greet','待投':'b-todo','已投·待回复':'b-sent','不合适':'b-nofit','面试中':'b-interview','已Offer':'b-offer','已拒':'b-reject'};
   var STATUS_COLOR={'待打招呼':'#fde2e2','待投':'#fef3c7','已投·待回复':'#ffe4d6','不合适':'#fef9c3','面试中':'#d1fae5','已Offer':'#c4b5fd','已拒':'#eef0f3'};
+  // 进入该区间即代表已实际投递（不合适=未投，不计入）；用于自动补「投递日期」
+  var DELIVERED_STATUS=['已投·待回复','面试中','已Offer','已拒'];
+  function isDeliveredStatus(s){ return DELIVERED_STATUS.indexOf(s)>=0; }
 
   function todayStr(){ return dateStr(); }
   function dateStr(){
@@ -1532,6 +1535,8 @@ document.addEventListener('touchmove', function(e){ if(e.touches.length > 1){ e.
       var rec=findById(id); if(!rec) return;
       setupStatusDropdown(dd, rec['投递状态'], function(val){
         rec['投递状态']=val; rec['更新时间']=nowStr();
+        // 状态进入「已投递」区间且未填投递日期时，自动记为当天（与 v276 招呼日期逻辑一致）
+        if(isDeliveredStatus(val) && !rec['投递日期']){ rec['投递日期']=nowStr().slice(0,10); }
         upsert(rec); loadData();
       });
     });
@@ -2395,6 +2400,8 @@ document.addEventListener('touchmove', function(e){ if(e.touches.length > 1){ e.
     rec['JD原文']=form.jd.value;
     rec['打招呼日期']=form.greetDate.value||'';
     rec['投递日期']=form.deliverDate.value||'';
+    // 状态进入「已投递」区间且未手填投递日期时，自动记为当天（与 v276 招呼日期逻辑一致）
+    if(isDeliveredStatus(rec['投递状态']) && !rec['投递日期']){ rec['投递日期']=nowStr().slice(0,10); }
     rec['面试日期']=form.interviewDate.value||'';
     if(!editingId){ rec['录入时间']=nowStr(); }
     rec['更新时间']=nowStr();
